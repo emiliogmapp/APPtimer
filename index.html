@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Arbeidstid</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f1f5f9;
+    color: #111827;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 4px 15px rgba(0,0,0,.08);
+}
+
+button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 15px;
+    background: #2563eb;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1d4ed8;
+}
+
+.danger {
+    background: #dc2626;
+}
+
+.green {
+    background: #16a34a;
+}
+
+.top {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+th {
+    background: #1e293b;
+    color: white;
+    padding: 12px;
+}
+
+td {
+    padding: 8px;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+input {
+    padding: 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 16px;
+}
+
+input[type="time"] {
+    width: 110px;
+}
+
+input[type="date"] {
+    width: 145px;
+}
+
+.result {
+    font-weight: bold;
+}
+
+.positive {
+    color: #15803d;
+}
+
+.negative {
+    color: #dc2626;
+}
+
+.zero {
+    color: #475569;
+}
+
+.day-total {
+    background: #f8fafc;
+    font-weight: bold;
+}
+
+.total-box {
+    margin-top: 25px;
+    padding: 18px;
+    background: #eff6ff;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.total-value {
+    font-size: 26px;
+    font-weight: bold;
+}
+
+.info {
+    margin-top: 15px;
+    color: #64748b;
+    text-align: center;
+}
+
+@media(max-width:600px) {
+
+    .container {
+        padding: 10px;
+    }
+
+    .card {
+        padding: 10px;
+    }
+
+    .top {
+        flex-direction: column;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Arbeidstid</h1>
+
+<div class="card">
+
+<div class="top">
+
+<button class="green" onclick="nyDag()">
++ Ny dag
+</button>
+
+<button class="danger" onclick="nullstill()">
+Nullstill
+</button>
+
+</div>
+
+<div class="table-wrapper">
+
+<table>
+
+<thead>
+<tr>
+    <th>Dato</th>
+    <th>Inn</th>
+    <th>Ut</th>
+    <th>Arbeidstid</th>
+    <th>Mer/Mindre</th>
+    <th>Del 2</th>
+    <th>Desimal</th>
+    <th></th>
+</tr>
+</thead>
+
+<tbody id="tabell"></tbody>
+
+</table>
+
+</div>
+
+<div class="total-box">
+
+<div> TOTAL MER/MINDRE </div>
+
+<div id="totalMer" class="total-value">
+00:00
+</div>
+
+</div>
+
+<div class="info">
+Normal arbeidstid: <strong>07:30 per dag</strong>
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+
+const NORMAL_TID = 450; // 7 timer og 30 minutter
+
+let dager =
+JSON.parse(localStorage.getItem("arbeidstidData")) || [];
+
+
+/* -------------------------
+   LAGRING
+------------------------- */
+
+function lagre() {
+
+    localStorage.setItem(
+        "arbeidstidData",
+        JSON.stringify(dager)
+    );
+
+}
+
+
+/* -------------------------
+   DAG
+------------------------- */
+
+function nyDag() {
+
+    dager.push({
+
+        dato: dagensDato(),
+
+        stemplinger: [
+            {
+                inn: "",
+                ut: ""
+            }
+        ]
+
+    });
+
+    lagre();
+    vis();
+
+}
+
+
+function dagensDato() {
+
+    const d = new Date();
+
+    const year = d.getFullYear();
+
+    const month =
+        String(d.getMonth() + 1)
+        .padStart(2, "0");
+
+    const day =
+        String(d.getDate())
+        .padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+
+}
+
+
+/* -------------------------
+   MINUTTER
+------------------------- */
+
+function tilMinutter(tid) {
+
+    if (!tid) return null;
+
+    const deler = tid.split(":");
+
+    return (
+        Number(deler[0]) * 60 +
+        Number(deler[1])
+    );
+
+}
+
+
+/* -------------------------
+   FORMATERE TID
+------------------------- */
+
+function formatTid(minutter) {
+
+    const negativ = minutter < 0;
+
+    minutter = Math.abs(
+        Math.round(minutter)
+    );
+
+    const timer =
+        Math.floor(minutter / 60);
+
+    const min =
+        minutter % 60;
+
+    const tekst =
+        String(timer).padStart(2,"0")
+        + ":"
+        +
+        String(min).padStart(2,"0");
+
+    return negativ
+        ? "-" + tekst
+        : tekst;
+
+}
+
+
+/* -------------------------
+   KLASSE
+------------------------- */
+
+function klasse(verdi) {
+
+    if (verdi > 0)
+        return "positive";
+
+    if (verdi < 0)
+        return "negative";
+
+    return "zero";
+
+}
+
+
+/* -------------------------
+   BEREGN DAG
+------------------------- */
+
+function beregnDag(dag) {
+
+    let arbeid = 0;
+
+    let gyldige = 0;
+
+
+    dag.stemplinger.forEach(stempel => {
+
+        if (!stempel.inn || !stempel.ut)
+            return;
+
+
+        const inn =
+            tilMinutter(stempel.inn);
+
+        const ut =
+            tilMinutter(stempel.ut);
+
+
+        /*
+           Ingen arbeid over midnatt.
+        */
+
+        if (ut <= inn)
+            return;
+
+
+        arbeid += ut - inn;
+
+        gyldige++;
+
+    });
+
+
+    if (gyldige === 0) {
+
+        return {
+            arbeid: null,
+            mer: null,
+            del: null,
+            desimal: null
+        };
+
+    }
+
+
+    /*
+       7:30 trekkes bare én gang
+       per dag.
+    */
+
+    const mer =
+        arbeid - NORMAL_TID;
+
+
+    /*
+       Del på 2.
+
+       Ved oddetall minutter
+       rundes ned mot null.
+    */
+
+    const del =
+        mer >= 0
+            ? Math.floor(mer / 2)
+            : Math.ceil(mer / 2);
+
+
+    /*
+       Desimal.
+    */
+
+    const desimal =
+        del / 60;
+
+
+    return {
+
+        arbeid,
+        mer,
+        del,
+        desimal
+
+    };
+
+}
+
+
+/* -------------------------
+   ENDRE STEMPEL
+------------------------- */
+
+function endreStempel(
+    dagIndex,
+    stempelIndex,
+    felt,
+    verdi
+) {
+
+    dager[
+        dagIndex
+    ].stemplinger[
+        stempelIndex
+    ][felt] = verdi;
+
+
+    lagre();
+
+    vis();
+
+}
+
+
+/* -------------------------
+   LEGG TIL STEMPEL
+------------------------- */
+
+function leggTilStempel(dagIndex) {
+
+    dager[dagIndex].stemplinger.push({
+
+        inn: "",
+        ut: ""
+
+    });
+
+    lagre();
+
+    vis();
+
+}
+
+
+/* -------------------------
+   SLETT STEMPEL
+------------------------- */
+
+function slettStempel(
+    dagIndex,
+    stempelIndex
+) {
+
+    dager[
+        dagIndex
+    ].stemplinger.splice(
+        stempelIndex,
+        1
+    );
+
+
+    /*
+       Sørg for at dagen
+       alltid har minst én rad.
+    */
+
+    if (
+        dager[dagIndex]
+        .stemplinger.length === 0
+    ) {
+
+        dager[dagIndex].stemplinger.push({
+            inn: "",
+            ut: ""
+        });
+
+    }
+
+
+    lagre();
+
+    vis();
+
+}
+
+
+/* -------------------------
+   VIS APP
+------------------------- */
+
+function vis() {
+
+    const tabell =
+        document.getElementById("tabell");
+
+
+    tabell.innerHTML = "";
+
+
+    let totalMer = 0;
+
+
+    dager.forEach((dag, dagIndex) => {
+
+        const resultat =
+            beregnDag(dag);
+
+
+        if (resultat.mer !== null) {
+
+            totalMer += resultat.mer;
+
+        }
+
+
+        dag.stemplinger.forEach(
+            (stempel, stempelIndex) => {
+
+                const rad =
+                    document.createElement("tr");
+
+
+                rad.innerHTML = `
+
+<td>
+
+<input
+type="date"
+value="${dag.dato}"
+onchange="
+endreDato(
+${dagIndex},
+this.value
+)
+">
+
+</td>
+
+
+<td>
+
+<input
+type="time"
+min="05:00"
+max="18:00"
+value="${stempel.inn}"
+onchange="
+endreStempel(
+${dagIndex},
+${stempelIndex},
+'inn',
+this.value
+)
+">
+
+</td>
+
+
+<td>
+
+<input
+type="time"
+min="05:00"
+max="18:00"
+value="${stempel.ut}"
+onchange="
+endreStempel(
+${dagIndex},
+${stempelIndex},
+'ut',
+this.value
+)
+">
+
+</td>
+
+
+<td class="result">
+
+${
+    resultat.arbeid !== null
+    ? formatTid(resultat.arbeid)
+    : "--:--"
+}
+
+</td>
+
+
+<td class="result ${
+    resultat.mer !== null
+    ? klasse(resultat.mer)
+    : ""
+}">
+
+${
+    resultat.mer !== null
+    ? formatTid(resultat.mer)
+    : "--:--"
+}
+
+</td>
+
+
+<td class="result ${
+    resultat.del !== null
+    ? klasse(resultat.del)
+    : ""
+}">
+
+${
+    resultat.del !== null
+    ? formatTid(resultat.del)
+    : "--:--"
+}
+
+</td>
+
+
+<td class="result ${
+    resultat.del !== null
+    ? klasse(resultat.del)
+    : ""
+}">
+
+${
+    resultat.desimal !== null
+    ? resultat.desimal
+        .toFixed(2)
+        .replace(".", ",")
+    : "--"
+}
+
+</td>
+
+
+<td>
+
+<button
+onclick="
+slettStempel(
+${dagIndex},
+${stempelIndex}
+)
+">
+
+×
+</button>
+
+</td>
+
+`;
+
+
+                tabell.appendChild(rad);
+
+            }
+        );
+
+
+        /*
+           Egen rad under dagens stemplinger.
+        */
+
+        const dagRad =
+            document.createElement("tr");
+
+
+        dagRad.className =
+            "day-total";
+
+
+        dagRad.innerHTML = `
+
+<td colspan="3">
+
+<button
+onclick="
+leggTilStempel(${dagIndex})
+">
+
++ Stempling
+
+</button>
+
+</td>
+
+
+<td>
+
+${
+    resultat.arbeid !== null
+    ? formatTid(resultat.arbeid)
+    : "--:--"
+}
+
+</td>
+
+
+<td class="${
+    resultat.mer !== null
+    ? klasse(resultat.mer)
+    : ""
+}">
+
+${
+    resultat.mer !== null
+    ? formatTid(resultat.mer)
+    : "--:--"
+}
+
+</td>
+
+
+<td>
+
+${
+    resultat.del !== null
+    ? formatTid(resultat.del)
+    : "--:--"
+}
+
+</td>
+
+
+<td>
+
+${
+    resultat.desimal !== null
+    ? resultat.desimal
+        .toFixed(2)
+        .replace(".", ",")
+    : "--"
+}
+
+</td>
+
+
+<td></td>
+
+`;
+
+
+        tabell.appendChild(dagRad);
+
+    });
+
+
+    document.getElementById(
+        "totalMer"
+    ).textContent =
+        formatTid(totalMer);
+
+}
+
+
+/* -------------------------
+   ENDRE DATO
+------------------------- */
+
+function endreDato(
+    dagIndex,
+    dato
+) {
+
+    dager[dagIndex].dato = dato;
+
+    lagre();
+
+    vis();
+
+}
+
+
+/* -------------------------
+   NULLSTILL
+------------------------- */
+
+function nullstill() {
+
+    if (
+        !confirm(
+            "Vil du slette alle registrerte dager?"
+        )
+    ) {
+
+        return;
+
+    }
+
+
+    dager = [];
+
+    lagre();
+
+    vis();
+
+}
+
+
+/* -------------------------
+   START
+------------------------- */
+
+if (dager.length === 0) {
+
+    nyDag();
+
+} else {
+
+    vis();
+
+}
+
+</script>
+
+</body>
+</html>
