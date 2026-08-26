@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="no">
 <head>
@@ -142,9 +141,9 @@ input[type="date"] {
 }
 
 .status {
-    margin-top: 10px;
+    margin-top: 15px;
     text-align: center;
-    font-size: 13px;
+    font-size: 14px;
     color: #64748b;
 }
 
@@ -154,6 +153,10 @@ input[type="date"] {
 
 .status.error {
     color: #dc2626;
+}
+
+.status.loading {
+    color: #2563eb;
 }
 
 @media(max-width:600px) {
@@ -230,8 +233,8 @@ Nullstill
 Normal arbeidstid: <strong>07:30 per dag</strong>
 </div>
 
-<div id="status" class="status">
-Kobler til databasen...
+<div id="status" class="status loading">
+Kobler til Supabase...
 </div>
 
 </div>
@@ -251,42 +254,43 @@ const SUPABASE_URL =
 const SUPABASE_KEY =
     "sb_publishable_G_7u82nBFdTuNdnPJHvNdg_hJ6kxQ2o";
 
-const TABLE =
-    "timer";
+const TABLE = "timer";
 
 
 /* =========================================================
    ARBEIDSTID
 ========================================================= */
 
-const NORMAL_TID = 450; // 7 timer og 30 minutter
+const NORMAL_TID = 450;
 
 let dager = [];
 
-let lasterData = false;
+let laster = false;
+
+let lagrer = false;
 
 
 /* =========================================================
    STATUS
 ========================================================= */
 
-function settStatus(tekst, type = "") {
+function status(tekst, type = "") {
 
-    const status =
+    const element =
         document.getElementById("status");
 
-    status.textContent = tekst;
+    element.textContent = tekst;
 
-    status.className =
+    element.className =
         "status " + type;
 }
 
 
 /* =========================================================
-   SUPABASE HEADERS
+   HEADERS
 ========================================================= */
 
-function supabaseHeaders() {
+function headers() {
 
     return {
 
@@ -304,10 +308,20 @@ function supabaseHeaders() {
 
 
 /* =========================================================
-   HENTE DATA FRA SUPABASE
+   HENT ALLE DATA
 ========================================================= */
 
 async function hentData() {
+
+    if (lagrer)
+        return;
+
+    laster = true;
+
+    status(
+        "Henter siste data...",
+        "loading"
+    );
 
     try {
 
@@ -319,16 +333,18 @@ async function hentData() {
                 "?select=id,dato,stemplinger,updated_at&order=dato.asc",
                 {
                     method: "GET",
-                    headers: supabaseHeaders()
+                    headers: headers(),
+                    cache: "no-store"
                 }
             );
 
 
         if (!response.ok) {
 
-            throw new Error(
-                "HTTP " + response.status
-            );
+            const feil =
+                await response.text();
+
+            throw new Error(feil);
 
         }
 
@@ -337,150 +353,64 @@ async function hentData() {
             await response.json();
 
 
-        /*
-           Hvis databasen har data,
-           bruker vi databasen.
-        */
+        dager =
+            data.map(rad => ({
 
-        if (data.length > 0) {
+                id:
+                    rad.id,
 
-            dager =
-                data.map(rad => ({
+                dato:
+                    rad.dato,
 
-                    id:
-                        rad.id,
+                stemplinger:
+                    Array.isArray(
+                        rad.stemplinger
+                    )
+                    ? rad.stemplinger
+                    : [
+                        {
+                            inn: "",
+                            ut: ""
+                        }
+                    ]
 
-                    dato:
-                        rad.dato,
+            }));
 
-                    stemplinger:
-                        Array.isArray(rad.stemplinger)
-                        ? rad.stemplinger
-                        : [
-                            {
-                                inn: "",
-                                ut: ""
-                            }
-                        ]
-
-                }));
-
-        }
 
         /*
-           Hvis databasen er tom,
-           prøver vi å hente gammel
-           localStorage-data og flytte
-           den til Supabase.
+           Supabase er nå master.
+           Vi bruker IKKE localStorage
+           til å hente gamle data.
         */
 
-        else {
 
-            const gammel =
-                localStorage.getItem(
-                    "arbeidstidData"
-                );
+        vis();
 
 
-            if (gammel) {
-
-                try {
-
-                    dager =
-                        JSON.parse(gammel);
-
-
-                    dager =
-                        dager.map(dag => ({
-
-                            id:
-                                dag.id ||
-                                crypto.randomUUID(),
-
-                            dato:
-                                dag.dato,
-
-                            stemplinger:
-                                dag.stemplinger ||
-                                [
-                                    {
-                                        inn: "",
-                                        ut: ""
-                                    }
-                                ]
-
-                        }));
-
-
-                    if (dager.length > 0) {
-
-                        await lagreAlle();
-
-                    }
-
-                }
-                catch (e) {
-
-                    dager = [];
-
-                }
-
-            }
-
-        }
-
-
-        settStatus(
-            "Synkronisert",
+        status(
+            "✓ Synkronisert",
             "ok"
         );
 
-        vis();
 
     }
     catch (error) {
 
         console.error(
-            "Feil ved henting:",
+            "Supabase-feil:",
             error
         );
 
-        settStatus(
-            "Kunne ikke koble til databasen",
+
+        status(
+            "Feil ved tilkobling til Supabase",
             "error"
         );
 
+    }
+    finally {
 
-        /*
-           Fallback til lokal lagring
-           hvis internett/database ikke
-           er tilgjengelig.
-        */
-
-        const lokal =
-            localStorage.getItem(
-                "arbeidstidData"
-            );
-
-
-        if (lokal) {
-
-            try {
-
-                dager =
-                    JSON.parse(lokal);
-
-            }
-            catch (e) {
-
-                dager = [];
-
-            }
-
-        }
-
-
-        vis();
+        laster = false;
 
     }
 
@@ -488,7 +418,7 @@ async function hentData() {
 
 
 /* =========================================================
-   LAGRE ÉN DAG
+   LAGRE DAG
 ========================================================= */
 
 async function lagreDag(dag) {
@@ -499,6 +429,15 @@ async function lagreDag(dag) {
             crypto.randomUUID();
 
     }
+
+
+    lagrer = true;
+
+
+    status(
+        "Lagrer...",
+        "loading"
+    );
 
 
     const data = {
@@ -527,11 +466,12 @@ async function lagreDag(dag) {
                 TABLE +
                 "?on_conflict=id",
                 {
+
                     method: "POST",
 
                     headers: {
 
-                        ...supabaseHeaders(),
+                        ...headers(),
 
                         "Prefer":
                             "resolution=merge-duplicates,return=minimal"
@@ -547,72 +487,47 @@ async function lagreDag(dag) {
 
         if (!response.ok) {
 
-            const tekst =
+            const feil =
                 await response.text();
 
-            throw new Error(
-                tekst ||
-                "HTTP " + response.status
-            );
+            throw new Error(feil);
 
         }
 
 
-        settStatus(
-            "Lagret og synkronisert",
+        status(
+            "✓ Lagret",
             "ok"
         );
 
 
         /*
-           Lokal backup.
+           Hent data på nytt fra serveren.
+           Dette gjør at denne enheten
+           også viser nøyaktig det som
+           ligger i databasen.
         */
 
-        localStorage.setItem(
-            "arbeidstidData",
-            JSON.stringify(dager)
-        );
-
+        await hentData();
 
     }
     catch (error) {
 
         console.error(
-            "Feil ved lagring:",
+            "Lagringsfeil:",
             error
         );
 
 
-        /*
-           Lagre lokalt hvis
-           nettverket er nede.
-        */
-
-        localStorage.setItem(
-            "arbeidstidData",
-            JSON.stringify(dager)
-        );
-
-
-        settStatus(
-            "Lagret lokalt – ikke synkronisert",
+        status(
+            "Kunne ikke lagre",
             "error"
         );
 
     }
+    finally {
 
-}
-
-
-/* =========================================================
-   LAGRE ALLE DAGER
-========================================================= */
-
-async function lagreAlle() {
-
-    for (const dag of dager) {
-
-        await lagreDag(dag);
+        lagrer = false;
 
     }
 
@@ -620,7 +535,7 @@ async function lagreAlle() {
 
 
 /* =========================================================
-   DAG
+   NY DAG
 ========================================================= */
 
 async function nyDag() {
@@ -655,7 +570,7 @@ async function nyDag() {
 
 
 /* =========================================================
-   DAGENS DATO
+   DATO
 ========================================================= */
 
 function dagensDato() {
@@ -708,7 +623,7 @@ function tilMinutter(tid) {
 
 
 /* =========================================================
-   FORMATERE TID
+   FORMAT TID
 ========================================================= */
 
 function formatTid(minutter) {
@@ -792,10 +707,6 @@ function beregnDag(dag) {
                 );
 
 
-            /*
-               Ingen arbeid over midnatt.
-            */
-
             if (ut <= inn)
                 return;
 
@@ -826,21 +737,9 @@ function beregnDag(dag) {
     }
 
 
-    /*
-       7:30 trekkes bare én gang
-       per dag.
-    */
-
     const mer =
         arbeid - NORMAL_TID;
 
-
-    /*
-       Del på 2.
-
-       Ved oddetall minutter
-       rundes ned mot null.
-    */
 
     const del =
         mer >= 0
@@ -891,6 +790,7 @@ async function endreStempel(
 
     vis();
 
+
     await lagreDag(
         dager[dagIndex]
     );
@@ -919,6 +819,7 @@ async function leggTilStempel(
 
     vis();
 
+
     await lagreDag(
         dager[dagIndex]
     );
@@ -943,18 +844,14 @@ async function slettStempel(
     );
 
 
-    /*
-       Sørg for at dagen
-       alltid har minst én rad.
-    */
-
     if (
         dager[dagIndex]
         .stemplinger.length === 0
     ) {
 
-        dager[dagIndex]
-        .stemplinger.push({
+        dager[
+            dagIndex
+        ].stemplinger.push({
 
             inn: "",
 
@@ -967,6 +864,7 @@ async function slettStempel(
 
     vis();
 
+
     await lagreDag(
         dager[dagIndex]
     );
@@ -975,7 +873,31 @@ async function slettStempel(
 
 
 /* =========================================================
-   VIS APP
+   ENDRE DATO
+========================================================= */
+
+async function endreDato(
+    dagIndex,
+    dato
+) {
+
+    dager[
+        dagIndex
+    ].dato = dato;
+
+
+    vis();
+
+
+    await lagreDag(
+        dager[dagIndex]
+    );
+
+}
+
+
+/* =========================================================
+   VIS
 ========================================================= */
 
 function vis() {
@@ -1024,7 +946,6 @@ function vis() {
                     rad.innerHTML = `
 
 <td>
-
 <input
 type="date"
 value="${dag.dato}"
@@ -1034,12 +955,9 @@ ${dagIndex},
 this.value
 )
 ">
-
 </td>
 
-
 <td>
-
 <input
 type="time"
 min="05:00"
@@ -1053,12 +971,9 @@ ${stempelIndex},
 this.value
 )
 ">
-
 </td>
 
-
 <td>
-
 <input
 type="time"
 min="05:00"
@@ -1072,57 +987,45 @@ ${stempelIndex},
 this.value
 )
 ">
-
 </td>
 
-
 <td class="result">
-
 ${
     resultat.arbeid !== null
     ? formatTid(resultat.arbeid)
     : "--:--"
 }
-
 </td>
-
 
 <td class="result ${
     resultat.mer !== null
     ? klasse(resultat.mer)
     : ""
 }">
-
 ${
     resultat.mer !== null
     ? formatTid(resultat.mer)
     : "--:--"
 }
-
 </td>
-
 
 <td class="result ${
     resultat.del !== null
     ? klasse(resultat.del)
     : ""
 }">
-
 ${
     resultat.del !== null
     ? formatTid(resultat.del)
     : "--:--"
 }
-
 </td>
-
 
 <td class="result ${
     resultat.del !== null
     ? klasse(resultat.del)
     : ""
 }">
-
 ${
     resultat.desimal !== null
     ? resultat.desimal
@@ -1130,12 +1033,9 @@ ${
         .replace(".", ",")
     : "--"
 }
-
 </td>
 
-
 <td>
-
 <button
 onclick="
 slettStempel(
@@ -1143,13 +1043,9 @@ ${dagIndex},
 ${stempelIndex}
 )
 ">
-
 ×
-
 </button>
-
 </td>
-
 `;
 
 
@@ -1160,11 +1056,6 @@ ${stempelIndex}
                 }
             );
 
-
-            /*
-               Egen rad under dagens
-               stemplinger.
-            */
 
             const dagRad =
                 document.createElement(
@@ -1191,7 +1082,6 @@ leggTilStempel(${dagIndex})
 
 </td>
 
-
 <td>
 
 ${
@@ -1203,7 +1093,6 @@ ${
 }
 
 </td>
-
 
 <td class="${
     resultat.mer !== null
@@ -1221,7 +1110,6 @@ ${
 
 </td>
 
-
 <td>
 
 ${
@@ -1233,7 +1121,6 @@ ${
 }
 
 </td>
-
 
 <td>
 
@@ -1247,9 +1134,7 @@ ${
 
 </td>
 
-
 <td></td>
-
 `;
 
 
@@ -1265,29 +1150,6 @@ ${
         "totalMer"
     ).textContent =
         formatTid(totalMer);
-
-}
-
-
-/* =========================================================
-   ENDRE DATO
-========================================================= */
-
-async function endreDato(
-    dagIndex,
-    dato
-) {
-
-    dager[
-        dagIndex
-    ].dato = dato;
-
-
-    vis();
-
-    await lagreDag(
-        dager[dagIndex]
-    );
 
 }
 
@@ -1309,9 +1171,14 @@ async function nullstill() {
     }
 
 
-    /*
-       Slett fra Supabase først.
-    */
+    lagrer = true;
+
+
+    status(
+        "Sletter...",
+        "loading"
+    );
+
 
     try {
 
@@ -1322,180 +1189,82 @@ async function nullstill() {
                 TABLE +
                 "?id=not.is.null",
                 {
+
                     method: "DELETE",
 
-                    headers:
-                        supabaseHeaders()
+                    headers: {
+
+                        ...headers(),
+
+                        "Prefer":
+                            "return=minimal"
+
+                    }
+
                 }
             );
 
 
         if (!response.ok) {
 
-            throw new Error(
-                "Kunne ikke slette data"
-            );
+            const feil =
+                await response.text();
+
+            throw new Error(feil);
 
         }
+
+
+        dager = [];
+
+
+        vis();
+
+
+        status(
+            "✓ Alle dager er slettet",
+            "ok"
+        );
+
 
     }
     catch (error) {
 
         console.error(error);
 
-        settStatus(
-            "Kunne ikke slette fra databasen",
+        status(
+            "Kunne ikke slette data",
             "error"
         );
 
-        return;
+    }
+    finally {
+
+        lagrer = false;
 
     }
-
-
-    dager = [];
-
-
-    localStorage.removeItem(
-        "arbeidstidData"
-    );
-
-
-    vis();
-
-
-    settStatus(
-        "Alle dager er slettet",
-        "ok"
-    );
-
-
-    /*
-       Lag en ny tom dag.
-    */
-
-    await nyDag();
 
 }
 
 
 /* =========================================================
-   AUTOMATISK SYNKRONISERING
+   AUTOMATISK OPPDATERING
 ========================================================= */
 
-async function oppdaterFraDatabase() {
+setInterval(
+    async function() {
 
-    if (lasterData)
-        return;
+        if (
+            !laster &&
+            !lagrer
+        ) {
 
-
-    /*
-       Ikke hent data mens brukeren
-       holder på å gjøre endringer.
-    */
-
-    try {
-
-        const response =
-            await fetch(
-                SUPABASE_URL +
-                "/rest/v1/" +
-                TABLE +
-                "?select=id,dato,stemplinger,updated_at&order=dato.asc",
-                {
-                    method: "GET",
-                    headers:
-                        supabaseHeaders()
-                }
-            );
-
-
-        if (!response.ok)
-            return;
-
-
-        const data =
-            await response.json();
-
-
-        /*
-           Bare oppdater hvis databasen
-           faktisk har data.
-        */
-
-        if (data.length > 0) {
-
-            const nyeDager =
-                data.map(rad => ({
-
-                    id:
-                        rad.id,
-
-                    dato:
-                        rad.dato,
-
-                    stemplinger:
-                        Array.isArray(
-                            rad.stemplinger
-                        )
-                        ? rad.stemplinger
-                        : [
-                            {
-                                inn: "",
-                                ut: ""
-                            }
-                        ]
-
-                }));
-
-
-            /*
-               Sammenlign data før vi
-               tegner skjermen på nytt.
-            */
-
-            const gammel =
-                JSON.stringify(dager);
-
-            const ny =
-                JSON.stringify(nyeDager);
-
-
-            if (gammel !== ny) {
-
-                dager =
-                    nyeDager;
-
-                vis();
-
-                settStatus(
-                    "Oppdatert fra server",
-                    "ok"
-                );
-
-            }
+            await hentData();
 
         }
 
-    }
-    catch (error) {
-
-        console.log(
-            "Synkronisering venter..."
-        );
-
-    }
-
-}
-
-
-/*
-   Sjekk databasen hvert 10. sekund.
-*/
-
-setInterval(
-    oppdaterFraDatabase,
-    10000
+    },
+    5000
 );
 
 
@@ -1505,20 +1274,17 @@ setInterval(
 
 async function startApp() {
 
-    lasterData = true;
-
     await hentData();
-
-    lasterData = false;
 
 
     /*
-       Hvis databasen er helt tom
-       og det ikke finnes lokal data,
-       opprett én ny dag.
+       Hvis Supabase er helt tom,
+       opprettes én dag.
     */
 
-    if (dager.length === 0) {
+    if (
+        dager.length === 0
+    ) {
 
         await nyDag();
 
@@ -1527,14 +1293,9 @@ async function startApp() {
 }
 
 
-/*
-   Start appen.
-*/
-
 startApp();
 
 </script>
 
 </body>
 </html>
-```
