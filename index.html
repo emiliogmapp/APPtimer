@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Arbeidstid</title>
+<title>APPtimer</title>
 
 <style>
 * {
@@ -21,7 +21,7 @@ body {
 .container {
     max-width: 1100px;
     margin: auto;
-    padding: 20px;
+    padding: 15px;
 }
 
 h1 {
@@ -35,8 +35,14 @@ h1 {
     box-shadow: 0 4px 15px rgba(0,0,0,.08);
 }
 
+.top {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
 button {
-    border: none;
+    border: 0;
     border-radius: 8px;
     padding: 10px 15px;
     background: #2563eb;
@@ -45,22 +51,16 @@ button {
     cursor: pointer;
 }
 
-button:hover {
-    background: #1d4ed8;
+.green {
+    background: #16a34a;
 }
 
 .danger {
     background: #dc2626;
 }
 
-.green {
-    background: #16a34a;
-}
-
-.top {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+.blue {
+    background: #2563eb;
 }
 
 .table-wrapper {
@@ -70,7 +70,7 @@ button:hover {
 table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 900px;
+    min-width: 850px;
 }
 
 th {
@@ -92,12 +92,12 @@ input {
     font-size: 16px;
 }
 
-input[type="time"] {
-    width: 110px;
-}
-
 input[type="date"] {
     width: 145px;
+}
+
+input[type="time"] {
+    width: 110px;
 }
 
 .result {
@@ -130,39 +130,31 @@ input[type="date"] {
 }
 
 .total-value {
-    font-size: 26px;
+    font-size: 28px;
     font-weight: bold;
-}
-
-.info {
-    margin-top: 15px;
-    color: #64748b;
-    text-align: center;
 }
 
 .status {
     margin-top: 15px;
     text-align: center;
     font-size: 14px;
-    color: #64748b;
 }
 
-.status.ok {
+.ok {
     color: #15803d;
 }
 
-.status.error {
+.error {
     color: #dc2626;
 }
 
-.status.loading {
+.loading {
     color: #2563eb;
 }
 
 @media(max-width:600px) {
-
     .container {
-        padding: 10px;
+        padding: 8px;
     }
 
     .card {
@@ -194,6 +186,10 @@ input[type="date"] {
 Nullstill
 </button>
 
+<button class="blue" onclick="hentData()">
+↻ Oppdater
+</button>
+
 </div>
 
 <div class="table-wrapper">
@@ -202,14 +198,14 @@ Nullstill
 
 <thead>
 <tr>
-    <th>Dato</th>
-    <th>Inn</th>
-    <th>Ut</th>
-    <th>Arbeidstid</th>
-    <th>Mer/Mindre</th>
-    <th>Del 2</th>
-    <th>Desimal</th>
-    <th></th>
+<th>Dato</th>
+<th>Inn</th>
+<th>Ut</th>
+<th>Arbeidstid</th>
+<th>Mer/Mindre</th>
+<th>Del 2</th>
+<th>Desimal</th>
+<th></th>
 </tr>
 </thead>
 
@@ -229,7 +225,7 @@ Nullstill
 
 </div>
 
-<div class="info">
+<div style="text-align:center;margin-top:15px;">
 Normal arbeidstid: <strong>07:30 per dag</strong>
 </div>
 
@@ -244,22 +240,17 @@ Kobler til Supabase...
 
 <script>
 
-/* =========================================================
+/* =====================================================
    SUPABASE
-========================================================= */
+===================================================== */
 
 const SUPABASE_URL =
-    "https://blcsronstyddcavlqllb.supabase.co";
+"https://blcsronstyddcavlqllb.supabase.co";
 
 const SUPABASE_KEY =
-    "sb_publishable_G_7u82nBFdTuNdnPJHvNdg_hJ6kxQ2o";
+"sb_publishable_G_7u82nBFdTuNdnPJHvNdg_hJ6kxQ2o";
 
 const TABLE = "timer";
-
-
-/* =========================================================
-   ARBEIDSTID
-========================================================= */
 
 const NORMAL_TID = 450;
 
@@ -270,67 +261,66 @@ let laster = false;
 let lagrer = false;
 
 
-/* =========================================================
-   STATUS
-========================================================= */
-
-function status(tekst, type = "") {
-
-    const element =
-        document.getElementById("status");
-
-    element.textContent = tekst;
-
-    element.className =
-        "status " + type;
-}
-
-
-/* =========================================================
-   HEADERS
-========================================================= */
+/* =====================================================
+   SUPABASE HEADERS
+===================================================== */
 
 function headers() {
 
     return {
-
         "apikey": SUPABASE_KEY,
-
-        "Authorization":
-            "Bearer " + SUPABASE_KEY,
-
-        "Content-Type":
-            "application/json"
-
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type": "application/json"
     };
 
 }
 
 
-/* =========================================================
-   HENT ALLE DATA
-========================================================= */
+/* =====================================================
+   STATUS
+===================================================== */
+
+function visStatus(tekst, klasse = "") {
+
+    const el =
+        document.getElementById("status");
+
+    el.textContent = tekst;
+
+    el.className =
+        "status " + klasse;
+
+}
+
+
+/* =====================================================
+   HENT DATA FRA SUPABASE
+===================================================== */
 
 async function hentData() {
 
-    if (lagrer)
+    if (laster || lagrer)
         return;
 
     laster = true;
 
-    status(
-        "Henter siste data...",
+    visStatus(
+        "Henter data...",
         "loading"
     );
 
     try {
 
+        const url =
+            SUPABASE_URL +
+            "/rest/v1/" +
+            TABLE +
+            "?select=id,date,start,slutt,stemplinger,updated_at&order=date.asc,id.asc";
+
+
         const response =
             await fetch(
-                SUPABASE_URL +
-                "/rest/v1/" +
-                TABLE +
-                "?select=id,dato,stemplinger,updated_at&order=dato.asc",
+                url,
                 {
                     method: "GET",
                     headers: headers(),
@@ -344,7 +334,12 @@ async function hentData() {
             const feil =
                 await response.text();
 
-            throw new Error(feil);
+            throw new Error(
+                "HTTP " +
+                response.status +
+                ": " +
+                feil
+            );
 
         }
 
@@ -354,44 +349,56 @@ async function hentData() {
 
 
         dager =
-            data.map(rad => ({
+            data.map(rad => {
 
-                id:
-                    rad.id,
+                let stemplinger =
+                    rad.stemplinger;
 
-                dato:
-                    rad.dato,
 
-                stemplinger:
-                    Array.isArray(
-                        rad.stemplinger
-                    )
-                    ? rad.stemplinger
-                    : [
+                if (
+                    !Array.isArray(stemplinger)
+                    ||
+                    stemplinger.length === 0
+                ) {
+
+                    stemplinger = [
+
                         {
-                            inn: "",
-                            ut: ""
+                            inn:
+                                rad.start || "",
+
+                            ut:
+                                rad.slutt || ""
                         }
-                    ]
 
-            }));
+                    ];
+
+                }
 
 
-        /*
-           Supabase er nå master.
-           Vi bruker IKKE localStorage
-           til å hente gamle data.
-        */
+                return {
+
+                    id:
+                        rad.id,
+
+                    dato:
+                        rad.date,
+
+                    stemplinger:
+                        stemplinger
+
+                };
+
+            });
 
 
         vis();
 
 
-        status(
+        visStatus(
             "✓ Synkronisert",
             "ok"
         );
-
 
     }
     catch (error) {
@@ -401,8 +408,7 @@ async function hentData() {
             error
         );
 
-
-        status(
+        visStatus(
             "Feil ved tilkobling til Supabase",
             "error"
         );
@@ -417,36 +423,34 @@ async function hentData() {
 }
 
 
-/* =========================================================
-   LAGRE DAG
-========================================================= */
+/* =====================================================
+   LAGRE
+===================================================== */
 
 async function lagreDag(dag) {
 
-    if (!dag.id) {
-
-        dag.id =
-            crypto.randomUUID();
-
-    }
-
-
     lagrer = true;
 
-
-    status(
+    visStatus(
         "Lagrer...",
         "loading"
     );
 
 
+    const første =
+        dag.stemplinger[0] || {};
+
+
     const data = {
 
-        id:
-            dag.id,
-
-        dato:
+        date:
             dag.dato,
+
+        start:
+            første.inn || "",
+
+        slutt:
+            første.ut || "",
 
         stemplinger:
             dag.stemplinger,
@@ -459,56 +463,122 @@ async function lagreDag(dag) {
 
     try {
 
-        const response =
-            await fetch(
-                SUPABASE_URL +
-                "/rest/v1/" +
-                TABLE +
-                "?on_conflict=id",
-                {
-
-                    method: "POST",
-
-                    headers: {
-
-                        ...headers(),
-
-                        "Prefer":
-                            "resolution=merge-duplicates,return=minimal"
-
-                    },
-
-                    body:
-                        JSON.stringify(data)
-
-                }
-            );
+        let response;
 
 
-        if (!response.ok) {
+        /* NY RAD */
 
-            const feil =
-                await response.text();
+        if (!dag.id) {
 
-            throw new Error(feil);
+            response =
+                await fetch(
+                    SUPABASE_URL +
+                    "/rest/v1/" +
+                    TABLE,
+                    {
+
+                        method: "POST",
+
+                        headers: {
+
+                            ...headers(),
+
+                            "Prefer":
+                                "return=representation"
+
+                        },
+
+                        body:
+                            JSON.stringify(data)
+
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                const feil =
+                    await response.text();
+
+                throw new Error(
+                    "HTTP " +
+                    response.status +
+                    ": " +
+                    feil
+                );
+
+            }
+
+
+            const resultat =
+                await response.json();
+
+
+            if (
+                resultat.length > 0
+            ) {
+
+                dag.id =
+                    resultat[0].id;
+
+            }
+
+        }
+
+        /* OPPDATER EKSISTERENDE */
+
+        else {
+
+            response =
+                await fetch(
+                    SUPABASE_URL +
+                    "/rest/v1/" +
+                    TABLE +
+                    "?id=eq." +
+                    encodeURIComponent(
+                        dag.id
+                    ),
+                    {
+
+                        method: "PATCH",
+
+                        headers: {
+
+                            ...headers(),
+
+                            "Prefer":
+                                "return=minimal"
+
+                        },
+
+                        body:
+                            JSON.stringify(data)
+
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                const feil =
+                    await response.text();
+
+                throw new Error(
+                    "HTTP " +
+                    response.status +
+                    ": " +
+                    feil
+                );
+
+            }
 
         }
 
 
-        status(
+        visStatus(
             "✓ Lagret",
             "ok"
         );
-
-
-        /*
-           Hent data på nytt fra serveren.
-           Dette gjør at denne enheten
-           også viser nøyaktig det som
-           ligger i databasen.
-        */
-
-        await hentData();
 
     }
     catch (error) {
@@ -518,8 +588,7 @@ async function lagreDag(dag) {
             error
         );
 
-
-        status(
+        visStatus(
             "Kunne ikke lagre",
             "error"
         );
@@ -534,16 +603,15 @@ async function lagreDag(dag) {
 }
 
 
-/* =========================================================
+/* =====================================================
    NY DAG
-========================================================= */
+===================================================== */
 
 async function nyDag() {
 
     const dag = {
 
-        id:
-            crypto.randomUUID(),
+        id: null,
 
         dato:
             dagensDato(),
@@ -564,47 +632,39 @@ async function nyDag() {
 
     vis();
 
+
     await lagreDag(dag);
 
 }
 
 
-/* =========================================================
-   DATO
-========================================================= */
+/* =====================================================
+   DAGENS DATO
+===================================================== */
 
 function dagensDato() {
 
     const d =
         new Date();
 
-    const year =
-        d.getFullYear();
-
-    const month =
-        String(
-            d.getMonth() + 1
-        ).padStart(2, "0");
-
-    const day =
-        String(
-            d.getDate()
-        ).padStart(2, "0");
-
     return (
-        year +
-        "-" +
-        month +
-        "-" +
-        day
+        d.getFullYear()
+        + "-"
+        + String(
+            d.getMonth() + 1
+        ).padStart(2, "0")
+        + "-"
+        + String(
+            d.getDate()
+        ).padStart(2, "0")
     );
 
 }
 
 
-/* =========================================================
-   MINUTTER
-========================================================= */
+/* =====================================================
+   TID TIL MINUTTER
+===================================================== */
 
 function tilMinutter(tid) {
 
@@ -615,41 +675,47 @@ function tilMinutter(tid) {
         tid.split(":");
 
     return (
-        Number(deler[0]) * 60 +
+        Number(deler[0]) * 60
+        +
         Number(deler[1])
     );
 
 }
 
 
-/* =========================================================
+/* =====================================================
    FORMAT TID
-========================================================= */
+===================================================== */
 
 function formatTid(minutter) {
 
     const negativ =
         minutter < 0;
 
+
     minutter =
         Math.abs(
             Math.round(minutter)
         );
+
 
     const timer =
         Math.floor(
             minutter / 60
         );
 
+
     const min =
         minutter % 60;
 
+
     const tekst =
-        String(timer).padStart(2, "0")
+        String(timer).padStart(2,"0")
         +
         ":"
         +
-        String(min).padStart(2, "0");
+        String(min).padStart(2,"0");
+
 
     return negativ
         ? "-" + tekst
@@ -658,9 +724,9 @@ function formatTid(minutter) {
 }
 
 
-/* =========================================================
+/* =====================================================
    KLASSE
-========================================================= */
+===================================================== */
 
 function klasse(verdi) {
 
@@ -675,9 +741,9 @@ function klasse(verdi) {
 }
 
 
-/* =========================================================
+/* =====================================================
    BEREGN DAG
-========================================================= */
+===================================================== */
 
 function beregnDag(dag) {
 
@@ -701,6 +767,7 @@ function beregnDag(dag) {
                     stempel.inn
                 );
 
+
             const ut =
                 tilMinutter(
                     stempel.ut
@@ -713,6 +780,7 @@ function beregnDag(dag) {
 
             arbeid +=
                 ut - inn;
+
 
             gyldige++;
 
@@ -743,36 +811,28 @@ function beregnDag(dag) {
 
     const del =
         mer >= 0
-            ? Math.floor(
-                mer / 2
-              )
-            : Math.ceil(
-                mer / 2
-              );
-
-
-    const desimal =
-        del / 60;
+        ? Math.floor(mer / 2)
+        : Math.ceil(mer / 2);
 
 
     return {
 
-        arbeid,
+        arbeid: arbeid,
 
-        mer,
+        mer: mer,
 
-        del,
+        del: del,
 
-        desimal
+        desimal: del / 60
 
     };
 
 }
 
 
-/* =========================================================
+/* =====================================================
    ENDRE STEMPEL
-========================================================= */
+===================================================== */
 
 async function endreStempel(
     dagIndex,
@@ -798,9 +858,33 @@ async function endreStempel(
 }
 
 
-/* =========================================================
+/* =====================================================
+   ENDRE DATO
+===================================================== */
+
+async function endreDato(
+    dagIndex,
+    dato
+) {
+
+    dager[
+        dagIndex
+    ].dato = dato;
+
+
+    vis();
+
+
+    await lagreDag(
+        dager[dagIndex]
+    );
+
+}
+
+
+/* =====================================================
    LEGG TIL STEMPEL
-========================================================= */
+===================================================== */
 
 async function leggTilStempel(
     dagIndex
@@ -827,9 +911,9 @@ async function leggTilStempel(
 }
 
 
-/* =========================================================
+/* =====================================================
    SLETT STEMPEL
-========================================================= */
+===================================================== */
 
 async function slettStempel(
     dagIndex,
@@ -845,8 +929,9 @@ async function slettStempel(
 
 
     if (
-        dager[dagIndex]
-        .stemplinger.length === 0
+        dager[
+            dagIndex
+        ].stemplinger.length === 0
     ) {
 
         dager[
@@ -872,33 +957,102 @@ async function slettStempel(
 }
 
 
-/* =========================================================
-   ENDRE DATO
-========================================================= */
+/* =====================================================
+   SLETT ALLE
+===================================================== */
 
-async function endreDato(
-    dagIndex,
-    dato
-) {
+async function nullstill() {
 
-    dager[
-        dagIndex
-    ].dato = dato;
+    if (
+        !confirm(
+            "Vil du slette alle registrerte dager?"
+        )
+    ) {
+
+        return;
+
+    }
 
 
-    vis();
+    lagrer = true;
 
 
-    await lagreDag(
-        dager[dagIndex]
+    visStatus(
+        "Sletter...",
+        "loading"
     );
+
+
+    try {
+
+        const response =
+            await fetch(
+                SUPABASE_URL +
+                "/rest/v1/" +
+                TABLE +
+                "?id=not.is.null",
+                {
+
+                    method: "DELETE",
+
+                    headers: headers()
+
+                }
+            );
+
+
+        if (!response.ok) {
+
+            const feil =
+                await response.text();
+
+            throw new Error(
+                "HTTP " +
+                response.status +
+                ": " +
+                feil
+            );
+
+        }
+
+
+        dager = [];
+
+
+        vis();
+
+
+        visStatus(
+            "✓ Alle dager er slettet",
+            "ok"
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Slettefeil:",
+            error
+        );
+
+        visStatus(
+            "Kunne ikke slette",
+            "error"
+        );
+
+    }
+    finally {
+
+        lagrer = false;
+
+    }
 
 }
 
 
-/* =========================================================
-   VIS
-========================================================= */
+/* =====================================================
+   VIS APP
+===================================================== */
 
 function vis() {
 
@@ -946,23 +1100,26 @@ function vis() {
                     rad.innerHTML = `
 
 <td>
+
 <input
 type="date"
-value="${dag.dato}"
+value="${dag.dato || ""}"
 onchange="
 endreDato(
 ${dagIndex},
 this.value
 )
 ">
+
 </td>
 
 <td>
+
 <input
 type="time"
-min="05:00"
-max="18:00"
-value="${stempel.inn}"
+min="00:00"
+max="23:59"
+value="${stempel.inn || ""}"
 onchange="
 endreStempel(
 ${dagIndex},
@@ -971,14 +1128,16 @@ ${stempelIndex},
 this.value
 )
 ">
+
 </td>
 
 <td>
+
 <input
 type="time"
-min="05:00"
-max="18:00"
-value="${stempel.ut}"
+min="00:00"
+max="23:59"
+value="${stempel.ut || ""}"
 onchange="
 endreStempel(
 ${dagIndex},
@@ -987,14 +1146,17 @@ ${stempelIndex},
 this.value
 )
 ">
+
 </td>
 
 <td class="result">
+
 ${
     resultat.arbeid !== null
     ? formatTid(resultat.arbeid)
     : "--:--"
 }
+
 </td>
 
 <td class="result ${
@@ -1002,11 +1164,13 @@ ${
     ? klasse(resultat.mer)
     : ""
 }">
+
 ${
     resultat.mer !== null
     ? formatTid(resultat.mer)
     : "--:--"
 }
+
 </td>
 
 <td class="result ${
@@ -1014,11 +1178,13 @@ ${
     ? klasse(resultat.del)
     : ""
 }">
+
 ${
     resultat.del !== null
     ? formatTid(resultat.del)
     : "--:--"
 }
+
 </td>
 
 <td class="result ${
@@ -1026,6 +1192,7 @@ ${
     ? klasse(resultat.del)
     : ""
 }">
+
 ${
     resultat.desimal !== null
     ? resultat.desimal
@@ -1033,19 +1200,26 @@ ${
         .replace(".", ",")
     : "--"
 }
+
 </td>
 
 <td>
+
 <button
+class="danger"
 onclick="
 slettStempel(
 ${dagIndex},
 ${stempelIndex}
 )
 ">
+
 ×
+
 </button>
+
 </td>
+
 `;
 
 
@@ -1073,7 +1247,9 @@ ${stempelIndex}
 
 <button
 onclick="
-leggTilStempel(${dagIndex})
+leggTilStempel(
+${dagIndex}
+)
 ">
 
 + Stempling
@@ -1086,9 +1262,7 @@ leggTilStempel(${dagIndex})
 
 ${
     resultat.arbeid !== null
-    ? formatTid(
-        resultat.arbeid
-      )
+    ? formatTid(resultat.arbeid)
     : "--:--"
 }
 
@@ -1102,9 +1276,7 @@ ${
 
 ${
     resultat.mer !== null
-    ? formatTid(
-        resultat.mer
-      )
+    ? formatTid(resultat.mer)
     : "--:--"
 }
 
@@ -1114,9 +1286,7 @@ ${
 
 ${
     resultat.del !== null
-    ? formatTid(
-        resultat.del
-      )
+    ? formatTid(resultat.del)
     : "--:--"
 }
 
@@ -1135,6 +1305,7 @@ ${
 </td>
 
 <td></td>
+
 `;
 
 
@@ -1154,112 +1325,19 @@ ${
 }
 
 
-/* =========================================================
-   NULLSTILL
-========================================================= */
-
-async function nullstill() {
-
-    if (
-        !confirm(
-            "Vil du slette alle registrerte dager?"
-        )
-    ) {
-
-        return;
-
-    }
-
-
-    lagrer = true;
-
-
-    status(
-        "Sletter...",
-        "loading"
-    );
-
-
-    try {
-
-        const response =
-            await fetch(
-                SUPABASE_URL +
-                "/rest/v1/" +
-                TABLE +
-                "?id=not.is.null",
-                {
-
-                    method: "DELETE",
-
-                    headers: {
-
-                        ...headers(),
-
-                        "Prefer":
-                            "return=minimal"
-
-                    }
-
-                }
-            );
-
-
-        if (!response.ok) {
-
-            const feil =
-                await response.text();
-
-            throw new Error(feil);
-
-        }
-
-
-        dager = [];
-
-
-        vis();
-
-
-        status(
-            "✓ Alle dager er slettet",
-            "ok"
-        );
-
-
-    }
-    catch (error) {
-
-        console.error(error);
-
-        status(
-            "Kunne ikke slette data",
-            "error"
-        );
-
-    }
-    finally {
-
-        lagrer = false;
-
-    }
-
-}
-
-
-/* =========================================================
-   AUTOMATISK OPPDATERING
-========================================================= */
+/* =====================================================
+   AUTOMATISK SYNKRONISERING
+===================================================== */
 
 setInterval(
-    async function() {
+    function() {
 
         if (
             !laster &&
             !lagrer
         ) {
 
-            await hentData();
+            hentData();
 
         }
 
@@ -1268,32 +1346,11 @@ setInterval(
 );
 
 
-/* =========================================================
+/* =====================================================
    START
-========================================================= */
+===================================================== */
 
-async function startApp() {
-
-    await hentData();
-
-
-    /*
-       Hvis Supabase er helt tom,
-       opprettes én dag.
-    */
-
-    if (
-        dager.length === 0
-    ) {
-
-        await nyDag();
-
-    }
-
-}
-
-
-startApp();
+hentData();
 
 </script>
 
